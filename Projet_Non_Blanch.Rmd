@@ -1,0 +1,56 @@
+---
+title: "Projet_Non_Blanch"
+output: html_document
+date: "2024-02-14"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(MultiVarSel)
+```
+
+```{r}
+setwd('~/Prog_APT_windows/Project')
+```
+
+```{r}
+proto <- read.table("Table_proteome_FH_all.csv",sep=";",header=T, dec = ",")
+head(proto)
+```
+```{r}
+for (i in 2:5){
+  proto[,i] <- as.factor(proto[,i])
+}
+head(proto)
+
+```
+
+```{r}
+Y <- as.matrix(proto[,c(6:499)])
+X <- model.matrix(lm(Y ~ temperature:imbibition + 0, data=proto)) #alpha1=0 // +0 enleve le effet moyenne m
+```
+
+```{r}
+p <- ncol(X)
+n <- nrow(X)
+q <- dim(Y)[2]
+```
+
+Residuals
+```{r}
+residuals=lm(as.matrix(Y)~X-1)$residuals
+```
+
+```{r}
+pvalue=whitening_test(residuals)
+print(pvalue)
+```
+```{r}
+ANOVA2voi_P = lm(Y~ temperature:imbibition -1 , data=proto)
+ANOVA2voi_P
+summary(ANOVA2voi_P)
+```
+

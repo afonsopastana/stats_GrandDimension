@@ -1,0 +1,102 @@
+---
+title: "Projet"
+output: html_document
+date: "2024-02-14"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(MultiVarSel)
+library(dplyr)
+```
+
+```{r}
+setwd('~/Prog_APT_windows/Project')
+```
+
+```{r}
+proto <- read.table("Table_proteome_FH_all.csv",sep=";",header=T, dec = ",")
+head(proto)
+```
+```{r}
+print(n_distinct(proto$imbibition))
+print(n_distinct(proto$temperature))
+```
+
+```{r}
+for (i in 2:5){
+  proto[,i] <- as.factor(proto[,i])
+}
+head(proto)
+
+```
+
+```{r}
+Y <- as.matrix(proto[,c(6:499)])
+X <- model.matrix(lm(Y ~ (temperature+imbibition)+0, data=proto)) #alpha1=0 // +0 enleve le effet moyenne m
+```
+
+```{r}
+p <- ncol(X)
+n <- nrow(X)
+q <- dim(Y)[2]
+```
+
+Residuals
+```{r}
+residuals=lm(as.matrix(Y)~X-1)$residuals
+```
+
+```{r}
+pvalue=whitening_test(residuals)
+print(pvalue)
+```
+```{r}
+result = whitening_choice(residuals,c("AR1","nonparam","ARMA"),pAR=2,qMA=2)
+print(result)
+```
+```{r}
+square_root_inv_hat_Sigma=whitening(residuals,"nonparam",pAR=1,qMA=0)
+```
+
+```{r}
+frequencies=variable_selection(Y,X,square_root_inv_hat_Sigma, nb_repli=200,parallel=FALSE)
+```
+
+```{r}
+frequencies
+```
+
+```{r}
+save(frequencies, file='frequencies_nbreplis_200.Rdata')
+```
+
+```{r}
+load('frequencies_nbreplis_200.Rdata')
+```
+
+```{r}
+colnames(frequencies)<-c('names_of_Y','names_of_X','frequency')
+plot(sort(frequencies$frequency,decreasing = T),type='s')
+```
+```{r}
+head(frequencies)
+```
+```{r}
+seuil=0.1
+frequencies$names_of_X = gsub(pattern='temperature',replacement='', frequencies$names_of_X)
+indices = which(frequencies$frequency>=seuil) #Ici on fait la selection de coeficients
+```
+
+```{r}
+Yvec=as.numeric(Y%*%square_root_inv_hat_Sigma)
+Xvec=kronecker(t(square_root_inv_hat_Sigma),X)
+Xvec_sel=Xvec[,indices]
+B_sel_hat=solve(t(Xvec_sel)%*%Xvec_sel,t(Xvec_sel)%*%Yvec)
+frequencies$estim=rep(0,p*q)
+frequencies$estim[indices]=as.vector(B_sel_hat)
+```
+
