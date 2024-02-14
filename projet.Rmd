@@ -1,0 +1,129 @@
+---
+title: "projet"
+author: "Matthieu Verlynde"
+date: "2024-02-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r cars}
+data = read.table('Table_proteome_FH_all.csv', header = TRUE, sep = ';', dec = ',')
+
+data$temperature = as.factor(data$temperature)
+data$imbibition = as.factor(data$imbibition)
+```
+
+
+```{r}
+dim(data)
+str(data)
+head(data)
+```
+
+```{r}
+library(ggplot2)
+p <- ggplot(data, aes(x=imbibition, fill=temperature)) +
+  geom_bar(position = "dodge") +
+  theme_bw() +
+  ylab('Number of proteins') +
+  xlab('Imbibition')
+p
+```
+
+```{r}
+library(corrplot)
+library(ggcorrplot)
+
+# Calculate the correlation matrix
+cor_matrix <- cor(data[,-(1:5)])
+p.mat <- cor_pmat(data[,-(1:5)])
+head(p.mat[, 1:4])
+
+# # Create a basic correlation heatmap using ggcorrplot
+# corrplot(cor_matrix, method = "color")
+
+# Plot 10 most correlated variables
+ggcorrplot(cor_matrix, hc.order = TRUE, method = "square", colors = c("blue", "white", "red"), p.mat = p.mat, insig = 'blank', title = "Correlation plot of the variables")
+
+```
+
+```{r}
+Y <- as.matrix(data[,-(1:5)])
+X1 <- data[,4]
+X2 <- data[,5]
+X1 <- as.factor(X1)
+X2 <- as.factor(X2)
+```
+
+```{r}
+table(X1,X2)
+```
+
+
+```{r}
+X <- model.matrix(lm(Y ~ X1 * X2 + 0))
+p <- ncol(X)
+n=nrow(X)
+n
+```
+
+```{r}
+q <- dim(Y)[2]
+q
+```
+
+```{r}
+residuals=lm(as.matrix(Y)~X-1)$residuals
+```
+
+```{r}
+library(MultiVarSel)
+pvalue=whitening_test(residuals)
+pvalue
+```
+
+```{r}
+as.matrix(X)
+```
+
+```{r}
+result=whitening_choice(residuals,c("AR1","nonparam","ARMA"),pAR=1,qMA=1)
+result
+```
+
+```{r}
+square_root_inv_hat_Sigma=whitening(residuals,"nonparam")
+```
+
+
+```{r}
+Frequencies=variable_selection(Y,X,square_root_inv_hat_Sigma,nb_repli=50,parallel=FALSE)
+```
+
+
+```{r}
+colnames(Frequencies)<-c('Names_of_Y','Names_of_X','frequency')
+# Here we can consider the names of Y as numerical since they correspond
+# to the ratio m/z of the metabolites.
+Frequencies$Names_of_X<-sub('X2','',Frequencies$Names_of_X)
+Frequencies$Names_of_Y<-as.numeric(gsub('X','',gsub('\\.1$','',Frequencies$Names_of_Y)))
+
+p <- ggplot(data=Frequencies[Frequencies$frequency>=0.95,], aes(x=Names_of_Y,y=Names_of_X,color=frequency)) +
+  geom_tile(linewidth=0.75)+scale_color_gradient2(midpoint=0.95,mid ='orange') +
+  theme_bw()+ylab('Levels of X')+xlab('m/z')
+p
+```
+
+
+```{r}
+p <- ggplot(data=Frequencies[Frequencies$frequency==1,], aes(x=Names_of_Y,y=Names_of_X,color=Names_of_X)) +
+  geom_point(size=2) +
+  theme_bw()+ylab('Levels of X')+xlab('m/z')
+p
+```
+
+
